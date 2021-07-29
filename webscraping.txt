@@ -1,0 +1,69 @@
+/*----------------------------------------------------------------------------------------------+
+|Programa: Webscraping captura taxa DI_PRE da B3          	|
++-----------------------------------------------------------------------------------------------+
+|Local:
+ url="http://www2.bmf.com.br/pages/portal/bmfbovespa/lumis/lum-taxas-referenciais-bmf-ptBR.asp"                                       |
++-----------------------------------------------------------------------------------------------+
+|Objetivo: Automatizar o processo para execução diária                                                                                     |
++-------------------------------------------------------------------+---------------------------+
+
+
+/* Se a conexão passar por um servidor proxy adicionar o step abaixo */
+/*inicio*/
+filename B3 temp;
+proc http
+method="GET"
+url="http://www2.bmf.com.br/pages/portal/bmfbovespa/lumis/lum-taxas-referenciais-bmf-ptBR.asp"
+out= B3
+proxyhost= "nome_servidor_proxy"
+proxyport = 80
+proxyusername= "user"
+proxypassword= "password"
+;
+run;
+/*fim*/
+
+
+data DI_PRE;
+infile B3 length=len lrecl=32767;
+input line $varying32767. len;
+line = strip(line);
+if len>0;
+run;
+ 
+* REGRAS*/
+/* Analise as linhas e mantenha apenas os nomes das condições */
+/* Quando um código de condição for encontrado, pegue a linha seguinte(full name of condition) */
+/* and the 8th line following (Notification To date)  
+ * Depende do layout exato desta página e do esquema de quebra de linha */;
+
+data DI_PRE (keep= Dias_Corridos DI_PRE_252 DI_PRE_360);
+length Dias_Corridos $ 40 DI_PRE_252 $ 40 DI_PRE_252 $ 40;
+set DI_PRE;
+if find(line,"</thead>") then do;
+   Dias_Corridos=scan(line,1,'/');
+   pickup= _n_+1 ;
+   pickup2 = _n_+2;
+   pickup3 = _n_+3;
+
+
+   /* "lendo cabeçalho" linhao */
+   set DI_PRE (rename=(line=Dias_Corridos)) point=pickup;
+   /* Função SCAN utilizada para capturar apenas o valor desejado*/
+   Dias_Corridos = strip(scan(Dias_Corridos,2, '<>'));
+ 
+   /* "lendo cabeçalho" DI_PRE_252 line 2*/
+   set DI_PRE (rename=(line=DI_PRE_252)) point=pickup2;
+   /* função SCAN utilizada para capturar apenas o valor desejado*/
+   DI_PRE_252 = strip(scan(DI_PRE_252,2,'<>'));
+
+   /* "lendo cabeçalho" DI_PRE_360 line 3 */
+   set DI_PRE (rename=(line=DI_PRE_360)) point=pickup3;
+   /* função SCAN utilizada para capturar apenas o valor desejado*/
+   DI_PRE_360 = strip(scan(DI_PRE_360,2,'<>'));
+ 
+ 
+   /* write this record */
+   output;
+  end;
+  run;
